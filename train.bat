@@ -1,0 +1,1 @@
+python scripts\rsl_rl\train.py --task=Template-Direct-Pm01-Walk-Direct-v0 --headless

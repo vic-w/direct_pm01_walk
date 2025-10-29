@@ -23,6 +23,7 @@ class DirectPm01WalkEnv(DirectRLEnv):
 
     def __init__(self, cfg: DirectPm01WalkEnvCfg, render_mode: str | None = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
+        self.default_joint_pos = self.robot.data.default_joint_pos.clone()
 
 
     def _setup_scene(self):
@@ -35,7 +36,8 @@ class DirectPm01WalkEnv(DirectRLEnv):
 
     def _apply_action(self) -> None:
         action_scale = 1.0
-        self.robot.set_joint_effort_target(self.actions * action_scale)
+        joint_target = self.default_joint_pos + self.actions * action_scale
+        self.robot.set_joint_position_target(joint_target)
 
 
     def _get_observations(self) -> dict:
@@ -67,12 +69,16 @@ class DirectPm01WalkEnv(DirectRLEnv):
         super()._reset_idx(env_ids)
 
         # 默认状态
-        joint_pos = torch.zeros_like(self.robot.data.joint_pos[env_ids])
-        joint_vel = torch.zeros_like(self.robot.data.joint_vel[env_ids])
+        joint_pos = self.robot.data.default_joint_pos[env_ids].clone()
+        print("joint pos on reset:", joint_pos[0])
+        joint_vel = self.robot.data.default_joint_vel[env_ids].clone()
         root_state = self.robot.data.default_root_state[env_ids].clone()
+        print("root state on reset:", root_state[0])
 
         # 将每个环境放到对应的 origin（env_spacing 控制）
-        root_state[:, :3] = self.scene.env_origins[env_ids]
+        root_state[:, :3] += self.scene.env_origins[env_ids]
+
+        print("root state after setting origin:", root_state[0])
 
         # 写入仿真
         self.robot.write_root_pose_to_sim(root_state[:, :7], env_ids)

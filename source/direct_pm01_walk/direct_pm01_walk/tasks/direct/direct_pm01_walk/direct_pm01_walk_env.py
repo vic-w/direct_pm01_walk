@@ -16,7 +16,7 @@ from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
 from isaaclab.utils.math import sample_uniform
 
 from .direct_pm01_walk_env_cfg import DirectPm01WalkEnvCfg
-from direct_pm01_walk.tasks.direct.direct_pm01_walk.rewards.rewards import flat_orientation_l2
+from direct_pm01_walk.tasks.direct.direct_pm01_walk.rewards.rewards import *
 from isaaclab.utils.math import quat_apply
 
 
@@ -59,13 +59,17 @@ class DirectPm01WalkEnv(DirectRLEnv):
         return {"policy": obs}
 
     def _get_rewards(self) -> torch.Tensor:
-        flat_penalty = flat_orientation_l2(self)  # 传入 env
-        reward = -2.0 * flat_penalty
+        l2 = flat_orientation_l2(self)  # 传入 env
+        reward = -l2
+
+        penalty = fall_penalty(self)
+        reward = reward - penalty
+
         return reward
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         time_out = self.episode_length_buf >= self.max_episode_length - 1
-        fallen = self.robot.data.root_pos_w[:, 2] < 0.6
+        fallen = self.robot.data.root_pos_w[:, 2] < 0.4
         done = fallen
         return done, time_out
 

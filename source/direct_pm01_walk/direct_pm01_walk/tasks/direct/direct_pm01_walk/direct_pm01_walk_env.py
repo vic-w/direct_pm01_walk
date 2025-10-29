@@ -16,6 +16,9 @@ from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
 from isaaclab.utils.math import sample_uniform
 
 from .direct_pm01_walk_env_cfg import DirectPm01WalkEnvCfg
+from direct_pm01_walk.tasks.direct.direct_pm01_walk.rewards.rewards import flat_orientation_l2
+from isaaclab.utils.math import quat_apply
+
 
 
 class DirectPm01WalkEnv(DirectRLEnv):
@@ -46,19 +49,25 @@ class DirectPm01WalkEnv(DirectRLEnv):
         joint_pos = self.robot.data.joint_pos
         joint_vel = self.robot.data.joint_vel
 
-        obs = torch.cat([base_lin_vel, base_ang_vel, joint_pos, joint_vel], dim=-1)
+        base_quat = self.robot.data.root_quat_w
+        num_envs = base_quat.shape[0]
+        gravity_vec = torch.tensor([0.0, 0.0, -1.0], device=self.device, dtype=torch.float32).repeat(num_envs, 1)
+        projected_gravity = quat_apply(base_quat, gravity_vec)  # (num_envs, 3)
+
+        obs = torch.cat([base_lin_vel, base_ang_vel, joint_pos, joint_vel, projected_gravity], dim=-1)
+
         return {"policy": obs}
 
     def _get_rewards(self) -> torch.Tensor:
-        return torch.zeros(self.num_envs, device=self.device)
+        flat_penalty = flat_orientation_l2(self)  # 传入 env
+        reward = -2.0 * flat_penalty
+        return reward
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
-        """Return termination and timeout flags for each environment."""
-        # 1. 只根据 episode 长度判断超时
         time_out = self.episode_length_buf >= self.max_episode_length - 1
-        # 2. 当前不检测摔倒 / 越界
-        terminated = torch.zeros_like(time_out, device=self.device, dtype=torch.bool)
-        return terminated, time_out
+        fallen = self.robot.data.root_pos_w[:, 2] < 0.6
+        done = fallen
+        return done, time_out
 
     def _reset_idx(self, env_ids: Sequence[int] | None):
         """Reset selected environments to default state (minimal version)."""
@@ -70,15 +79,15 @@ class DirectPm01WalkEnv(DirectRLEnv):
 
         # 默认状态
         joint_pos = self.robot.data.default_joint_pos[env_ids].clone()
-        print("joint pos on reset:", joint_pos[0])
+        #print("joint pos on reset:", joint_pos[0])
         joint_vel = self.robot.data.default_joint_vel[env_ids].clone()
         root_state = self.robot.data.default_root_state[env_ids].clone()
-        print("root state on reset:", root_state[0])
+        #print("root state on reset:", root_state[0])
 
         # 将每个环境放到对应的 origin（env_spacing 控制）
         root_state[:, :3] += self.scene.env_origins[env_ids]
 
-        print("root state after setting origin:", root_state[0])
+        #print("root state after setting origin:", root_state[0])
 
         # 写入仿真
         self.robot.write_root_pose_to_sim(root_state[:, :7], env_ids)

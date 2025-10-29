@@ -16,6 +16,10 @@ import isaaclab.sim as sim_utils
 from isaaclab.sensors import ContactSensorCfg
 
 
+import gymnasium as gym
+import numpy as np
+
+
 @configclass
 class Pm01WalkSceneCfg(InteractiveSceneCfg):
     """Configuration for a cart-pole scene."""
@@ -50,12 +54,12 @@ class DirectPm01WalkEnvCfg(DirectRLEnvCfg):
     # env
     decimation = 2
     episode_length_s = 30.0
-    observation_space = 64   
-    action_space = 24        
+
+    observation_space = 57
+    action_space = 24
 
     # simulation
     sim: SimulationCfg = SimulationCfg(dt=1 / 200, render_interval=decimation)
 
     # scene
     scene: Pm01WalkSceneCfg = Pm01WalkSceneCfg(num_envs=4096, env_spacing=4.0, replicate_physics=True)
-

@@ -120,18 +120,16 @@ class DirectPm01WalkEnv(DirectRLEnv):
 
         #print("root state after setting origin:", root_state[0])
 
-        # # 姿态添加少量随机扰动
-        # quat = torch.tensor([1, 0, 0, 0], device=self.device).repeat(len(env_ids), 1)
-        # noise_axis = torch.randn_like(quat[:, 1:])
-        # noise_axis = noise_axis / torch.norm(noise_axis, dim=-1, keepdim=True)
-        # noise_angle = 0.05 * torch.randn(len(env_ids), 1, device=self.device)  # 约3度随机旋转
-        # sin_half = torch.sin(noise_angle / 2)
-        # quat_noise = torch.cat([torch.cos(noise_angle / 2), sin_half * noise_axis], dim=-1)
-        # root_state[:, 3:7] = quat_noise
+        # 姿态添加少量随机扰动
+        quat = torch.ones((len(env_ids), 4), device=self.device, dtype=torch.float32)
+        quat[:, 1:] = 0.0
+        noise_axis = torch.randn_like(quat[:, 1:])
+        noise_axis = noise_axis / torch.norm(noise_axis, dim=-1, keepdim=True)
+        noise_angle = 0.15 * torch.randn(len(env_ids), 1, device=self.device)  # 约9度随机旋转
+        sin_half = torch.sin(noise_angle / 2)
+        quat_noise = torch.cat([torch.cos(noise_angle / 2), sin_half * noise_axis], dim=-1)
+        root_state[:, 3:7] = quat_noise
 
-        # #base质心添加少量随机扰动
-        # com_offset = 0.01 * torch.randn(len(env_ids), 3, device=self.device)
-        # self.robot.data.com_pos_w[env_ids] += com_offset
 
         # 写入仿真
         self.robot.write_root_pose_to_sim(root_state[:, :7], env_ids)

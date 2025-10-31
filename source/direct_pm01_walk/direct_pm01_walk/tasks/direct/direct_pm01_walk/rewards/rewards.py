@@ -174,9 +174,9 @@ def get_gait_phase_reward(env):
     )
 
     # 归一化与截断，避免极端大值
-    r_phase = torch.tanh(r_phase * 3.0)
-    # 限制最大值为 0.5
-    r_phase = torch.clamp(r_phase, max=0.8) # tanh(x)=0.8时 x≈1.1，r_phase 最大约为1.1/3=0.37，左右脚“摆动度”差约0.37，高度差越0.2米。
+    r_phase = torch.tanh(r_phase * 5.0)
+    # 限制最大值为 0.1
+    r_phase = torch.clamp(r_phase, max=0.1, min=-0.1)
 
     return r_phase
 
@@ -248,3 +248,65 @@ def joint_symmetry_l2(env, joint_pairs):
         total_loss += symmetry_error
 
     return total_loss
+
+
+def joint_sum_l2(env, joint_names):
+    """
+    鼓励指定关节的角度之和接近 0。
+
+    参数:
+        env: 仿真环境对象，包含 env.robot.data.joint_pos。
+        joint_names: list[str]，指定需要约束的关节名列表。
+            例如：
+                ["left_shoulder_pitch", "right_shoulder_pitch", "torso_yaw"]
+
+    返回:
+        (num_envs,) 张量，表示每个环境的惩罚值。
+    """
+    joint_pos = env.robot.data.joint_pos  # (num_envs, num_joints)
+    all_joint_names = env.robot.joint_names
+
+    # 找出这些关节的索引
+    indices = []
+    for name in joint_names:
+        try:
+            indices.append(all_joint_names.index(name))
+        except ValueError:
+            raise ValueError(f"无法在 joint_names 中找到关节：{name}")
+
+    if len(indices) == 0:
+        return torch.zeros(joint_pos.shape[0], device=env.device, dtype=joint_pos.dtype)
+
+    # 提取这些关节的角度
+    selected = joint_pos[:, indices]  # (num_envs, len(indices))
+
+    # 对每个环境计算这些角度的和
+    sum_val = selected.sum(dim=1)
+
+    # 目标是让 sum_val ≈ 0
+    loss = sum_val.pow(2)
+
+    return loss
+
+#两个关节相等
+def joint_equal_l2(env, joint_name_a, joint_name_b):
+    """
+    鼓励指定的两个关节角度相等。
+
+    参数:
+        env: 仿真环境对象，包含 env.robot.data.joint_pos。
+        joint_name_a: str，第一个关节名。
+        joint_name_b: str，第二个关节名。
+    """
+    joint_pos = env.robot.data.joint_pos
+    all_joint_names = env.robot.joint_names
+
+    try:
+        idx_a = all_joint_names.index(joint_name_a)
+        idx_b = all_joint_names.index(joint_name_b)
+    except ValueError as e:
+        raise ValueError(f"无法在 joint_names 中找到指定的关节：{e}")
+
+    # 计算两个关节的偏差
+    deviation = joint_pos[:, idx_a] - joint_pos[:, idx_b]
+    return deviation.pow(2)

@@ -65,7 +65,11 @@ class DirectPm01WalkEnv(DirectRLEnv):
         gravity_vec = torch.tensor([0.0, 0.0, -1.0], device=self.device, dtype=torch.float32).repeat(num_envs, 1)
         projected_gravity = quat_apply(base_quat, gravity_vec)  # (num_envs, 3)
 
-        obs = torch.cat([base_lin_vel, base_ang_vel, joint_pos, joint_vel, projected_gravity], dim=-1)
+        # phase的sin和cos
+        phase_sin = torch.sin(self.gait_phase).unsqueeze(-1)
+        phase_cos = torch.cos(self.gait_phase).unsqueeze(-1)
+
+        obs = torch.cat([base_lin_vel, base_ang_vel, joint_pos, joint_vel, projected_gravity, phase_sin, phase_cos], dim=-1)
 
         return {"policy": obs}
 
@@ -119,7 +123,7 @@ class DirectPm01WalkEnv(DirectRLEnv):
         reward -= ang_vel_xy_penalty * weight
 
         gait_phase_reward = get_gait_phase_reward(self)
-        weight = 5.0
+        weight = 5 #逐渐调大权重
         print("gait_phase_reward: %.3f \t weighted: %.3f" % (gait_phase_reward.mean().item(), gait_phase_reward.mean().item() * weight))
         reward += gait_phase_reward * weight
         
@@ -153,9 +157,29 @@ class DirectPm01WalkEnv(DirectRLEnv):
                                                        ["j03_knee_pitch_l", "j09_knee_pitch_r"],
                                                        ["j04_ankle_pitch_l", "j10_ankle_pitch_r"],
                                                    ])
-        weight = 0.1
+        weight = 0.0
         reward -= joint_symmetry_penalty * weight
         print("joint_symmetry_penalty: %.3f \t weighted: %.3f" % (-joint_symmetry_penalty.mean().item(), -joint_symmetry_penalty.mean().item() * weight))
+
+        left_leg_sum_penalty = joint_sum_l2(self, joint_names=["j00_hip_pitch_l", "j03_knee_pitch_l", "j04_ankle_pitch_l"])
+        weight = 0.1
+        reward -= left_leg_sum_penalty * weight
+        print("left_leg_sum_penalty: %.3f \t weighted: %.3f" % (-left_leg_sum_penalty.mean().item(), -left_leg_sum_penalty.mean().item() * weight))
+
+        left_leg_equal_penalty = joint_equal_l2(self, joint_name_a="j00_hip_pitch_l", joint_name_b="j04_ankle_pitch_l")
+        weight = 0.1
+        reward -= left_leg_equal_penalty * weight
+        print("left_leg_equal_penalty: %.3f \t weighted: %.3f" % (-left_leg_equal_penalty.mean().item(), -left_leg_equal_penalty.mean().item() * weight))
+
+        right_leg_sum_penalty = joint_sum_l2(self, joint_names=["j06_hip_pitch_r", "j09_knee_pitch_r", "j10_ankle_pitch_r"])
+        weight = 0.1
+        reward -= right_leg_sum_penalty * weight
+        print("right_leg_sum_penalty: %.3f \t weighted: %.3f" % (-right_leg_sum_penalty.mean().item(), -right_leg_sum_penalty.mean().item() * weight))
+
+        right_leg_equal_penalty = joint_equal_l2(self, joint_name_a="j06_hip_pitch_r", joint_name_b="j10_ankle_pitch_r")
+        weight = 0.1
+        reward -= right_leg_equal_penalty * weight
+        print("right_leg_equal_penalty: %.3f \t weighted: %.3f" % (-right_leg_equal_penalty.mean().item(), -right_leg_equal_penalty.mean().item() * weight))
 
         print("total reward: %.3f" % reward.mean().item())
         return reward
@@ -194,7 +218,7 @@ class DirectPm01WalkEnv(DirectRLEnv):
         noise_angle = 0.15 * torch.randn(len(env_ids), 1, device=self.device)  # 约9度随机旋转
         sin_half = torch.sin(noise_angle / 2)
         quat_noise = torch.cat([torch.cos(noise_angle / 2), sin_half * noise_axis], dim=-1)
-        root_state[:, 3:7] = quat_noise
+        #root_state[:, 3:7] = quat_noise
 
 
         # 写入仿真
@@ -202,4 +226,6 @@ class DirectPm01WalkEnv(DirectRLEnv):
         self.robot.write_root_velocity_to_sim(root_state[:, 7:], env_ids)
         self.robot.write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
 
-        self.gait_phase[env_ids] = 0.0
+        #self.gait_phase[env_ids] = 0.0
+        # 随机初始相位
+        self.gait_phase[env_ids] = sample_uniform(0.0, 2 * math.pi, (len(env_ids),), device=self.device)

@@ -27,7 +27,16 @@ class Pm01WalkSceneCfg(InteractiveSceneCfg):
     # ground plane
     ground = AssetBaseCfg(
         prim_path="/World/ground",
-        spawn=sim_utils.GroundPlaneCfg(size=(100.0, 100.0)),
+        spawn=sim_utils.GroundPlaneCfg(
+            size=(100.0, 100.0),
+            color=(0.9, 0.9, 0.9),
+            physics_material=sim_utils.RigidBodyMaterialCfg(
+                friction_combine_mode="multiply",
+                restitution_combine_mode="average",
+                static_friction=1.0,
+                dynamic_friction=1.0,
+            ),
+        ),
     )
 
     # robot
@@ -57,11 +66,14 @@ class DirectPm01WalkEnvCfg(DirectRLEnvCfg):
 
     # - spaces definition
     action_space = 24
-    observation_space = 57
+    observation_space = 59
     state_space = 2
 
     # simulation
-    sim: SimulationCfg = SimulationCfg(dt=1 / 200, render_interval=decimation)
+    sim: SimulationCfg = SimulationCfg(dt=1 / 200, 
+                                       render_interval=decimation, 
+                                       #gravity=(0.0, 0.0, 0.0),
+    )
 
     # scene
     scene: Pm01WalkSceneCfg = Pm01WalkSceneCfg(num_envs=4096, env_spacing=4.0, replicate_physics=True)

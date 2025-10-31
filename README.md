@@ -1,5 +1,14 @@
 # Template for Isaac Lab Projects
 
+1. 按代码里gait_phase_reward的weight=0.05，训练500个episode, Mean episode length接近1000，也就是很少摔倒
+2. gait_phase_reward的weight=0.5，训练1000个episode, 继续训练到不跌倒, gait_phase_reward的值也逐渐稳定
+3. gait_phase_reward的weight=5，训练3000个episode，再继续训练到不跌倒
+
+悬空预训练：
+1. 先将重力调为0，先训练步态，约3000 episode
+2. 再将重力加上，训练平衡，约3000 episode。
+3. checkpoint:2025-10-31_00-01-53
+
 ## Overview
 
 This project/repository serves as a template for building projects or extensions based on Isaac Lab.

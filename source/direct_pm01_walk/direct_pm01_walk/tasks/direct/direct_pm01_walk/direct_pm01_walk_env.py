@@ -218,7 +218,7 @@ class DirectPm01WalkEnv(DirectRLEnv):
         noise_angle = 0.15 * torch.randn(len(env_ids), 1, device=self.device)  # 约9度随机旋转
         sin_half = torch.sin(noise_angle / 2)
         quat_noise = torch.cat([torch.cos(noise_angle / 2), sin_half * noise_axis], dim=-1)
-        #root_state[:, 3:7] = quat_noise
+        root_state[:, 3:7] = quat_noise
 
 
         # 写入仿真

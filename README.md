@@ -8,6 +8,7 @@
 1. 先将重力调为0，先训练步态，约3000 episode
 2. 再将重力加上，训练平衡，约3000 episode。
 3. checkpoint:2025-10-31_00-01-53
+4. reset时各方向增加15度的随机扰动，训练3000 episode，checkpoint:2025-10-31_08-55-27
 
 ## Overview
 

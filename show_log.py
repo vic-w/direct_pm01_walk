@@ -59,8 +59,8 @@ def plot_metrics(data):
         ax.plot(values, color="C0", linewidth=1.2)
         ax.set_title(name, fontsize=10, pad=6)
         ax.grid(True, linestyle="--", alpha=0.4)
-        ax.set_xlabel("Step Index", fontsize=8)
-        ax.set_ylabel("Value", fontsize=8)
+        ax.set_xlabel("", fontsize=8)
+        ax.set_ylabel("", fontsize=8)
         if len(values) > 0:
             ymin, ymax = min(values), max(values)
             pad = (ymax - ymin) * 0.2 + 1e-3
@@ -72,7 +72,7 @@ def plot_metrics(data):
     for j in range(i + 1, len(axes)):
         axes[j].axis("off")
 
-    plt.tight_layout(rect=[0, 0, 1, 0.97], h_pad=3.2, w_pad=1.0)
+    plt.tight_layout(rect=[0, 0, 1, 0.97], h_pad=4, w_pad=1.0)
     plt.show()
 
 

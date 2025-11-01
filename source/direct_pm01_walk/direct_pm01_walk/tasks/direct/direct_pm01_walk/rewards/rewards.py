@@ -310,3 +310,35 @@ def joint_equal_l2(env, joint_name_a, joint_name_b):
     # 计算两个关节的偏差
     deviation = joint_pos[:, idx_a] - joint_pos[:, idx_b]
     return deviation.pow(2)
+
+# 以下为command相关奖励函数
+def command_lin_vel_tracking_reward(env):
+    """鼓励机体线速度在水平面上跟随目标指令。"""
+
+    if not hasattr(env, "commands"):
+        return torch.zeros(env.robot.data.root_lin_vel_b.shape[0], device=env.device)
+
+    base_lin_vel = env.robot.data.root_lin_vel_b
+    target = env.commands[:, :2]
+
+    tracking_error = base_lin_vel[:, :2] - target
+    # 使用高斯型奖励，使误差越小说明越接近目标方向
+    sigma_sq = 0.25  # (m/s)^2
+    reward = torch.exp(-tracking_error.pow(2).sum(dim=1) / sigma_sq)
+    return reward
+
+
+def command_ang_vel_tracking_reward(env):
+    """鼓励机体偏航角速度跟随目标指令。"""
+
+    if not hasattr(env, "commands"):
+        return torch.zeros(env.robot.data.root_ang_vel_b.shape[0], device=env.device)
+
+    base_ang_vel = env.robot.data.root_ang_vel_b[:, 2]
+    target = env.commands[:, 2]
+
+    tracking_error = base_ang_vel - target
+    sigma_sq = 0.5  # (rad/s)^2
+    reward = torch.exp(-tracking_error.pow(2) / sigma_sq)
+    return reward
+

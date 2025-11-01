@@ -35,6 +35,14 @@ class DirectPm01WalkEnv(DirectRLEnv):
         self._l = self._lfoot_ids[0]
         self._r = self._rfoot_ids[0]
 
+        #指令相关
+        # 行走指令（机体坐标系下 vx, vy, wz）
+        self.control_dt = float(self.cfg.sim.dt * self.cfg.decimation)
+        self.commands = torch.zeros((self.num_envs, 3), device=self.device)
+        self._command_time_left = torch.zeros(self.num_envs, device=self.device)
+        # 初始化指令
+        self._sample_commands(range(self.num_envs))
+
 
     def _setup_scene(self):
         self.robot = Articulation(self.cfg.scene.robot)
@@ -46,6 +54,13 @@ class DirectPm01WalkEnv(DirectRLEnv):
         self.gait_phase = (self.gait_phase + phase_delta) % (2 * math.pi)
 
         self.actions = actions.clone()
+
+        # 更新指令剩余时间并按需刷新
+        self._command_time_left -= self.control_dt
+        resample_ids = torch.nonzero(self._command_time_left <= 0.0, as_tuple=False).squeeze(-1)
+        if resample_ids.numel() > 0:
+            self._sample_commands(resample_ids)
+
 
 
     def _apply_action(self) -> None:
@@ -69,7 +84,19 @@ class DirectPm01WalkEnv(DirectRLEnv):
         phase_sin = torch.sin(self.gait_phase).unsqueeze(-1)
         phase_cos = torch.cos(self.gait_phase).unsqueeze(-1)
 
-        obs = torch.cat([base_lin_vel, base_ang_vel, joint_pos, joint_vel, projected_gravity, phase_sin, phase_cos], dim=-1)
+        obs = torch.cat(
+            [
+                base_lin_vel,
+                base_ang_vel,
+                joint_pos,
+                joint_vel,
+                projected_gravity,
+                phase_sin,
+                phase_cos,
+                self.commands,
+            ],
+            dim=-1,
+        )
 
         return {"policy": obs}
 
@@ -181,6 +208,17 @@ class DirectPm01WalkEnv(DirectRLEnv):
         reward -= right_leg_equal_penalty * weight
         print("right_leg_equal_penalty: %.3f \t weighted: %.3f" % (-right_leg_equal_penalty.mean().item(), -right_leg_equal_penalty.mean().item() * weight))
 
+        #指令跟踪奖励
+        command_lin_vel_reward = command_lin_vel_tracking_reward(self)
+        weight = 3.0
+        reward += command_lin_vel_reward * weight
+        print("command_lin_vel_reward: %.3f \t weighted: %.3f" % (command_lin_vel_reward.mean().item(), command_lin_vel_reward.mean().item() * weight))
+
+        command_ang_vel_reward = command_ang_vel_tracking_reward(self)
+        weight = 0.5
+        reward += command_ang_vel_reward * weight
+        print("command_ang_vel_reward: %.3f \t weighted: %.3f" % (command_ang_vel_reward.mean().item(), command_ang_vel_reward.mean().item() * weight))
+
         print("total reward: %.3f" % reward.mean().item())
         return reward
 
@@ -229,3 +267,32 @@ class DirectPm01WalkEnv(DirectRLEnv):
         #self.gait_phase[env_ids] = 0.0
         # 随机初始相位
         self.gait_phase[env_ids] = sample_uniform(0.0, 2 * math.pi, (len(env_ids),), device=self.device)
+
+        self._sample_commands(env_ids)
+
+    def _sample_commands(self, env_ids: Sequence[int] | torch.Tensor | None) -> None:
+        """为指定环境采样新的行走指令。"""
+
+        if env_ids is None:
+            env_ids = self.robot._ALL_INDICES
+
+        env_ids_t = torch.as_tensor(env_ids, device=self.device, dtype=torch.long)
+        if env_ids_t.numel() == 0:
+            return
+
+        num_envs = env_ids_t.shape[0]
+        cmd_cfg = self.cfg.commands
+
+        self.commands[env_ids_t, 0] = sample_uniform(
+            cmd_cfg.lin_vel_x[0], cmd_cfg.lin_vel_x[1], (num_envs,), device=self.device
+        )
+        self.commands[env_ids_t, 1] = sample_uniform(
+            cmd_cfg.lin_vel_y[0], cmd_cfg.lin_vel_y[1], (num_envs,), device=self.device
+        )
+        self.commands[env_ids_t, 2] = sample_uniform(
+            cmd_cfg.ang_vel_yaw[0], cmd_cfg.ang_vel_yaw[1], (num_envs,), device=self.device
+        )
+
+        self._command_time_left[env_ids_t] = sample_uniform(
+            cmd_cfg.resample_interval_range[0], cmd_cfg.resample_interval_range[1], (num_envs,), device=self.device
+        )

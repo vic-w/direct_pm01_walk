@@ -57,7 +57,6 @@ class Pm01WalkSceneCfg(InteractiveSceneCfg):
         track_air_time=True
     )
 
-
 @configclass
 class CommandCfg:
     """机器人跟随的目标指令范围设置。"""
@@ -88,6 +87,7 @@ class DirectPm01WalkEnvCfg(DirectRLEnvCfg):
     sim: SimulationCfg = SimulationCfg(dt=1 / 200, 
                                        render_interval=decimation, 
                                        #gravity=(0.0, 0.0, 0.0),
+
     )
 
     # scene

@@ -10,6 +10,7 @@
 3. checkpoint:2025-10-31_00-01-53
 4. reset时各方向增加15度的随机扰动，训练3000 episode，checkpoint:2025-10-31_08-55-27
 5. get_gait_phase_reward函数最后的clamp阈值从0.1加到0.2再加到0.4,让抬腿更高。每加一次训练3000 episode。chechpoint：2025-10-31_11-36-00
+6. 加上command，checkpoint：2025-11-02_08-32-08
 
 ## Overview
 

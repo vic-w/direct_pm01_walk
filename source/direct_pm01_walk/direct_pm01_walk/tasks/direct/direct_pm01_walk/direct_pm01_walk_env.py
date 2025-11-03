@@ -35,6 +35,11 @@ class DirectPm01WalkEnv(DirectRLEnv):
         self._l = self._lfoot_ids[0]
         self._r = self._rfoot_ids[0]
 
+        # IMU 信息缓存
+        self._prev_root_lin_vel_b = torch.zeros_like(self.robot.data.root_lin_vel_b)
+        self._prev_root_ang_vel_b = torch.zeros_like(self.robot.data.root_ang_vel_b)
+
+
         #指令相关
         # 行走指令（机体坐标系下 vx, vy, wz）
         self.control_dt = float(self.cfg.sim.dt * self.cfg.decimation)
@@ -70,8 +75,18 @@ class DirectPm01WalkEnv(DirectRLEnv):
 
 
     def _get_observations(self) -> dict:
+        current_lin_vel_b = self.robot.data.root_lin_vel_b
+        current_ang_vel_b = self.robot.data.root_ang_vel_b
+        # IMU 安装在 base link 原点且坐标与 base 一致，因此直接使用身体坐标系下的速度做差分。
+        # 差分过程中不涉及世界系转换，得到的线/角加速度仍然位于 IMU（身体）坐标系。
+        imu_lin_acc_b = (current_lin_vel_b - self._prev_root_lin_vel_b) / self.control_dt
+        imu_ang_acc_b = (current_ang_vel_b - self._prev_root_ang_vel_b) / self.control_dt
+        self._prev_root_lin_vel_b.copy_(current_lin_vel_b)
+        self._prev_root_ang_vel_b.copy_(current_ang_vel_b)
+    
         base_lin_vel = torch.zeros_like(self.robot.data.root_lin_vel_b) # self.robot.data.root_lin_vel_b
         base_ang_vel = torch.zeros_like(self.robot.data.root_ang_vel_b) # self.robot.data.root_ang_vel_b
+
         joint_pos = self.robot.data.joint_pos
         joint_vel = self.robot.data.joint_vel
 
@@ -86,8 +101,8 @@ class DirectPm01WalkEnv(DirectRLEnv):
 
         obs = torch.cat(
             [
-                base_lin_vel,
-                base_ang_vel,
+                imu_lin_acc_b,
+                imu_ang_acc_b,
                 joint_pos,
                 joint_vel,
                 projected_gravity,
@@ -247,6 +262,9 @@ class DirectPm01WalkEnv(DirectRLEnv):
         root_state[:, :3] += self.scene.env_origins[env_ids]
 
         #print("root state after setting origin:", root_state[0])
+        # 重置 IMU 速度缓存为0
+        self._prev_root_lin_vel_b[env_ids] = torch.zeros_like(self._prev_root_lin_vel_b[env_ids])
+        self._prev_root_ang_vel_b[env_ids] = torch.zeros_like(self._prev_root_ang_vel_b[env_ids])
 
         # 姿态添加少量随机扰动
         quat = torch.ones((len(env_ids), 4), device=self.device, dtype=torch.float32)

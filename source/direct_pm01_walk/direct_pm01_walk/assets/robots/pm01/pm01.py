@@ -62,13 +62,13 @@ PM01_CFG = ArticulationCfg(
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.85), 
         joint_pos={
-            "j00_hip_pitch_l": -0.2,   # 左髋前屈
-            "j03_knee_pitch_l": 0.45,   # 左膝弯曲
-            "j04_ankle_pitch_l": -0.2, # 左踝背屈（脚尖稍下压）
+            "j00_hip_pitch_l": -0.0,   # 左髋前屈
+            "j03_knee_pitch_l": 0.0,   # 左膝弯曲
+            "j04_ankle_pitch_l": 0.0, # 左踝背屈（脚尖稍下压）
 
-            "j06_hip_pitch_r": -0.2,   # 右髋前屈
-            "j09_knee_pitch_r": 0.45,   # 右膝弯曲
-            "j10_ankle_pitch_r": -0.2, # 右踝背屈
+            "j06_hip_pitch_r": -0.0,   # 右髋前屈
+            "j09_knee_pitch_r": 0.0,   # 右膝弯曲
+            "j10_ankle_pitch_r": -0.0, # 右踝背屈
         }
     ),
     soft_joint_pos_limit_factor=0.9,

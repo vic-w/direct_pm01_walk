@@ -176,7 +176,7 @@ class DirectPm01WalkEnv(DirectRLEnv):
                                                                       "j18_shoulder_pitch_r", "j19_shoulder_roll_r", "j20_shoulder_yaw_r",
                                                                       "j21_elbow_pitch_r", "j22_elbow_yaw_r",
                                                                       "j23_head_yaw"])
-        weight = 2.0
+        weight = 0.1
         reward -= upper_body_deviation_penalty * weight
         print("upper_body_deviation_penalty: %.3f \t weighted: %.3f" % (-upper_body_deviation_penalty.mean().item(), -upper_body_deviation_penalty.mean().item() * weight))
 
@@ -274,7 +274,7 @@ class DirectPm01WalkEnv(DirectRLEnv):
         noise_angle = 0.15 * torch.randn(len(env_ids), 1, device=self.device)  # 约9度随机旋转
         sin_half = torch.sin(noise_angle / 2)
         quat_noise = torch.cat([torch.cos(noise_angle / 2), sin_half * noise_axis], dim=-1)
-        root_state[:, 3:7] = quat_noise
+        #root_state[:, 3:7] = quat_noise
 
 
         # 写入仿真

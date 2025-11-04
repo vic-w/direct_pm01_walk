@@ -77,7 +77,7 @@ class CommandCfg:
 class DirectPm01WalkEnvCfg(DirectRLEnvCfg):
     # env
     decimation = 2
-    episode_length_s = 30.0
+    episode_length_s = 150.0
 
     # - spaces definition
     action_space = 24

@@ -47,6 +47,16 @@ class DirectPm01WalkEnv(DirectRLEnv):
         self._command_time_left = torch.zeros(self.num_envs, device=self.device)
         # 初始化指令
         self._sample_commands(range(self.num_envs))
+        
+        #symetry buffer
+        self.phase_key_angles = {
+            0: None,
+            1: None,
+            2: None,
+            3: None,
+        }
+        self.phase_threshold = 0.1  # 弧度阈值
+        self.phase_refs = torch.tensor([0.0, math.pi/2, math.pi, 3*math.pi/2], device=self.device)
 
 
     def _setup_scene(self):
@@ -65,6 +75,16 @@ class DirectPm01WalkEnv(DirectRLEnv):
         resample_ids = torch.nonzero(self._command_time_left <= 0.0, as_tuple=False).squeeze(-1)
         if resample_ids.numel() > 0:
             self._sample_commands(resample_ids)
+            
+            
+        # check symetry buffer
+        phase = self.gait_phase  # (num_envs,)
+        joint_pos = self.robot.data.joint_pos
+        for i, ref in enumerate(self.phase_refs):
+            near_ref = torch.abs((phase - ref + math.pi) % (2*math.pi) - math.pi) < self.phase_threshold
+            if near_ref.any():
+                # 记录这些环境的关键相位角度
+                self.phase_key_angles[i] = joint_pos.clone().detach()
 
 
 
@@ -216,22 +236,22 @@ class DirectPm01WalkEnv(DirectRLEnv):
         print("joint_symmetry_penalty: %.3f \t weighted: %.3f" % (-joint_symmetry_penalty.mean().item(), -joint_symmetry_penalty.mean().item() * weight))
 
         left_leg_sum_penalty = joint_sum_l2(self, joint_names=["j00_hip_pitch_l", "j03_knee_pitch_l", "j04_ankle_pitch_l"])
-        weight = 0.1
+        weight = 1
         reward -= left_leg_sum_penalty * weight
         print("left_leg_sum_penalty: %.3f \t weighted: %.3f" % (-left_leg_sum_penalty.mean().item(), -left_leg_sum_penalty.mean().item() * weight))
 
         left_leg_equal_penalty = joint_equal_l2(self, joint_name_a="j00_hip_pitch_l", joint_name_b="j04_ankle_pitch_l")
-        weight = 0.1
+        weight = 1
         reward -= left_leg_equal_penalty * weight
         print("left_leg_equal_penalty: %.3f \t weighted: %.3f" % (-left_leg_equal_penalty.mean().item(), -left_leg_equal_penalty.mean().item() * weight))
 
         right_leg_sum_penalty = joint_sum_l2(self, joint_names=["j06_hip_pitch_r", "j09_knee_pitch_r", "j10_ankle_pitch_r"])
-        weight = 0.1
+        weight = 1
         reward -= right_leg_sum_penalty * weight
         print("right_leg_sum_penalty: %.3f \t weighted: %.3f" % (-right_leg_sum_penalty.mean().item(), -right_leg_sum_penalty.mean().item() * weight))
 
         right_leg_equal_penalty = joint_equal_l2(self, joint_name_a="j06_hip_pitch_r", joint_name_b="j10_ankle_pitch_r")
-        weight = 0.1
+        weight = 1
         reward -= right_leg_equal_penalty * weight
         print("right_leg_equal_penalty: %.3f \t weighted: %.3f" % (-right_leg_equal_penalty.mean().item(), -right_leg_equal_penalty.mean().item() * weight))
 
@@ -245,6 +265,15 @@ class DirectPm01WalkEnv(DirectRLEnv):
         weight = 0#0.5
         reward += command_ang_vel_reward * weight
         print("command_ang_vel_reward: %.3f \t weighted: %.3f" % (command_ang_vel_reward.mean().item(), command_ang_vel_reward.mean().item() * weight))
+        
+        
+        gait_phase_symmetry_rwd = gait_phase_symmetry_reward(self, [['j00_hip_pitch_l', 'j06_hip_pitch_r'],
+                                                                    ['j13_shoulder_pitch_l', 'j18_shoulder_pitch_r'], 
+                                                                    ['j03_knee_pitch_l', 'j09_knee_pitch_r'],
+                                                                    ['j04_ankle_pitch_l', 'j11_ankle_roll_r']])
+        weight = 0.2
+        reward += gait_phase_symmetry_rwd * weight
+        print("gait_phase_symmetry_rwd: %.3f \t weighted: %.3f" % (gait_phase_symmetry_rwd.mean().item(), gait_phase_symmetry_rwd.mean().item() * weight))
 
         print("total reward: %.3f" % reward.mean().item())
         return reward

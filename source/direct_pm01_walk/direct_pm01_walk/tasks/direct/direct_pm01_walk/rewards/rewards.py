@@ -341,4 +341,62 @@ def command_ang_vel_tracking_reward(env):
     sigma_sq = 0.5  # (rad/s)^2
     reward = torch.exp(-tracking_error.pow(2) / sigma_sq)
     return reward
+    
+    
 
+def gait_phase_symmetry_reward(env, joint_pairs, alpha=10.0, beta=5.0, alt_limit=0.5):
+    """
+    改进版步态对称奖励：
+    - 对称性：相反相位（0↔180, 90↔270）左右关节应相等；
+    - 交替性：同一关节在相反相位差值大（但有上限）。
+
+    参数:
+        env: 环境对象，需包含 phase_key_angles。
+        joint_pairs: list[[str,str]] 对称关节名对。
+        alpha: 控制对称性惩罚强度。
+        beta: 控制交替性强化强度。
+        alt_limit: 交替差值的最大有效幅度（单位：弧度）。
+    """
+    if not hasattr(env, "phase_key_angles"):
+        raise RuntimeError("env.phase_key_angles 未初始化。")
+    if any(k not in env.phase_key_angles or env.phase_key_angles[k] is None for k in [0, 1, 2, 3]):
+        N = getattr(env, "num_envs", 1)
+        return torch.zeros(N, device=env.device)
+
+    pos0 = env.phase_key_angles[0]
+    pos1 = env.phase_key_angles[1]
+    pos2 = env.phase_key_angles[2]
+    pos3 = env.phase_key_angles[3]
+    name_to_idx = {n: i for i, n in enumerate(env.robot.joint_names)}
+
+    sym_errs, alt_diffs = [], []
+    for left, right in joint_pairs:
+        if left not in name_to_idx or right not in name_to_idx:
+            raise ValueError(f"未找到关节：{left} 或 {right}")
+        l_idx, r_idx = name_to_idx[left], name_to_idx[right]
+
+        # --- 对称相位下左右关节应相等 ---
+        diff_sym_1 = (pos0[:, l_idx] - pos2[:, r_idx]).pow(2)
+        diff_sym_2 = (pos1[:, l_idx] - pos3[:, r_idx]).pow(2)
+        sym_errs.append(diff_sym_1 + diff_sym_2)
+
+        # --- 同一关节在相反相位间应差异较大 ---
+        alt_L = torch.maximum(
+            torch.abs(pos0[:, l_idx] - pos2[:, l_idx]),
+            torch.abs(pos1[:, l_idx] - pos3[:, l_idx]),
+        )
+        alt_R = torch.maximum(
+            torch.abs(pos0[:, r_idx] - pos2[:, r_idx]),
+            torch.abs(pos1[:, r_idx] - pos3[:, r_idx]),
+        )
+        # 限幅并归一化到 [0,1]
+        alt_val = torch.tanh(alt_L / alt_limit) * 0.5 + torch.tanh(alt_R / alt_limit) * 0.5
+        alt_diffs.append(alt_val)
+
+    sym_err = torch.stack(sym_errs, dim=1).mean(dim=1)
+    alt_diff = torch.stack(alt_diffs, dim=1).mean(dim=1)
+
+    reward_sym = torch.exp(-alpha * sym_err)
+    reward_alt = torch.tanh(beta * alt_diff)
+    reward = 0.5 * reward_sym + 0.5 * reward_alt
+    return reward

@@ -174,10 +174,16 @@ class DirectPm01WalkEnv(DirectRLEnv):
         print("joint_acc_penalty: %.3f \t weighted: %.3f" % (-joint_acc_penalty.mean().item(), -joint_acc_penalty.mean().item() * weight))
         reward -= joint_acc_penalty * weight
 
-        action_rate_penalty = action_rate_l2(self)
+        #action_rate_penalty = action_rate_l2(self)
+        #weight = 0.01
+        #print("action_rate_penalty: %.3f \t weighted: %.3f" % (-action_rate_penalty.mean().item(), -action_rate_penalty.mean().item() * weight))
+        #reward -= action_rate_penalty * weight
+        
+        action_velocity_continuity_penalty = action_velocity_continuity(self)
         weight = 0.01
-        print("action_rate_penalty: %.3f \t weighted: %.3f" % (-action_rate_penalty.mean().item(), -action_rate_penalty.mean().item() * weight))
-        reward -= action_rate_penalty * weight
+        print("action_velocity_continuity_penalty: %.3f \t weighted: %.3f" % (-action_velocity_continuity_penalty.mean().item(), -action_velocity_continuity_penalty.mean().item() * weight))
+        reward -= action_velocity_continuity_penalty * weight
+       
 
         lin_vel_z_penalty = lin_vel_z_l2(self)
         weight = 10.0

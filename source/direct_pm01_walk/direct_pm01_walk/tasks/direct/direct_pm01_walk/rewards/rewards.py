@@ -117,6 +117,40 @@ def action_rate_l2(env):
     delta = actions - prev_actions
     return torch.sum(delta.pow(2), dim=1)
 
+def action_velocity_continuity(env):
+    """动作速度连续性惩罚，鼓励action变化平滑。
+                因为action表示关节目标位置，所以此处等价于限制关节位置指令的一阶导变化率。
+    """
+
+    actions = getattr(env, "actions", None)
+    if actions is None:
+        joint_pos = env.robot.data.joint_pos
+        return torch.zeros(joint_pos.shape[0], device=env.device, dtype=joint_pos.dtype)
+
+    # 取上一次的action和上上次的action
+    prev_actions = getattr(env, "_prev_actions", None)
+    prev_vel = getattr(env, "_prev_action_vel", None)
+   
+    # 当前动作速度（位置变化率）
+    if prev_actions is not None:
+        curr_vel = actions - prev_actions
+    else:
+        curr_vel = torch.zeros_like(actions)
+
+    # 存储当前状态供下次调用
+    env._prev_action_vel = curr_vel.clone()
+    env._prev_actions = actions.clone()
+
+    # 若还没有历史数据，则返回0
+    if prev_vel is None or prev_actions is None:
+        return torch.zeros(actions.shape[0], device=actions.device, dtype=actions.dtype)
+
+    # 计算动作速度变化率（二阶差分）
+    delta_vel = curr_vel - prev_vel
+
+    # L2 范数惩罚
+    return torch.sum(delta_vel.pow(2), dim=1)
+
 
 def lin_vel_z_l2(env):
     """线速度 Z 分量的平方惩罚，鼓励身体高度稳定。"""
@@ -195,7 +229,7 @@ def get_gait_phase_reward(env):
 
     # 当前脚的世界坐标高度
     zL, zR = body_pos[:, l_id, 2], body_pos[:, r_id, 2]
-    print('zL:', zL[0].item(), ' zR:', zR[0].item())
+    #print('zL:', zL[0].item(), ' zR:', zR[0].item())
 
     # 当前步态相位（假设随时间线性增加）
     phase = env.gait_phase
@@ -203,8 +237,8 @@ def get_gait_phase_reward(env):
 
     # 理想的脚高度曲线：sin(phase) 对应的目标高度
     # 左脚：在 sin>0 时高，右脚相反
-    target_L = 0.2 * torch.clamp(phase_sin, min=0.0)   # 正半周抬高到 +0.2m
-    target_R = 0.2 * torch.clamp(-phase_sin, min=0.0)  # 负半周抬高到 +0.2m
+    target_L = 0.3 * torch.clamp(phase_sin, min=0.0)   # 正半周抬高到 +0.2m
+    target_R = 0.3 * torch.clamp(-phase_sin, min=0.0)  # 负半周抬高到 +0.2m
 
     # 实际脚高度与目标高度的偏差
     err_L = (zL - target_L).pow(2)

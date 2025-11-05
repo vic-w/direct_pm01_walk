@@ -90,8 +90,6 @@ class DirectPm01WalkEnv(DirectRLEnv):
                 # 记录这些环境的关键相位角度
                 self.phase_key_angles[i] = joint_pos.clone().detach()
 
-
-
     def _apply_action(self) -> None:
         action_scale = 1.0
         joint_target = self.default_joint_pos + self.actions * action_scale
@@ -153,6 +151,7 @@ class DirectPm01WalkEnv(DirectRLEnv):
     # 头部：j23_head_yaw。
 
     def _get_rewards(self) -> torch.Tensor:
+   
         l2 = flat_orientation_l2(self)  # 传入 env
         weight = 1.0
         print("flat_orientation_l2: %.3f \t weighted: %.3f" % (-l2.mean().item(), -l2.mean().item() * weight))

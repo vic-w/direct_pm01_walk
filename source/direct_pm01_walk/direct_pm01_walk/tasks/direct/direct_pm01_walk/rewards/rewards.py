@@ -471,3 +471,78 @@ def gait_phase_symmetry_reward(env, joint_pairs, alpha=10.0, beta=5.0, alt_limit
     reward_alt = torch.tanh(beta * alt_diff)
     reward = 0.5 * reward_sym + 0.5 * reward_alt
     return reward
+    
+def feet_air_time_biped(env, link_names, threshold: float = 0.5):
+    """
+         奖励双足交替迈步（单脚支撑）行为。
+
+         参数:
+        env: 仿真环境对象，需包含 env.scene.sensors['contact_sensor']。
+        link_names: list[str]，指定脚部 link 名称列表（例如 ["left_foot", "right_foot"]）。
+        threshold: float，最大奖励对应的腾空/接触持续时间阈值（秒）。
+
+         返回:
+        (num_envs,) 张量，表示每个环境的奖励值。
+    """
+    
+    print('body names:', env.scene.sensors["contact_forces"].body_names)
+    print('body names:', env.scene.sensors["contact_forces"].body_names)
+
+    # 获取脚部对应的 ID
+    contact_sensor = env.scene.sensors.get("contact_forces", None)
+    if contact_sensor is None:
+        raise ValueError("未在 env.scene.sensors 中找到 'contact_forces'。")
+
+    all_body_names = env.scene["robot"].body_names
+    
+    indices = []
+    for name in link_names:
+        try:
+            indices.append(all_body_names.index(name))
+        except ValueError:
+            raise ValueError(f"无法在 rigid_body_names 中找到 link：{name}")
+
+    if len(indices) == 0:
+        return torch.zeros(env.num_envs, device=env.device)
+
+    # 获取对应 link 的触地与腾空时间
+    air_time = contact_sensor.data.current_air_time[:, indices]
+    print('air time:', air_time)
+    contact_time = contact_sensor.data.current_contact_time[:, indices]
+    print('contact_time:', contact_time)
+    in_contact = contact_time > 0.0
+    print('in_contact:', in_contact)
+
+    # 当前“模式时间”：如果在地面则用接触时间，否则用腾空时间
+    in_mode_time = torch.where(in_contact, contact_time, air_time)
+    print('in_mode_time:', in_mode_time)
+
+    # 单脚支撑状态（正好一只脚在地）
+    single_stance = torch.sum(in_contact.int(), dim=1) == 1
+    print('single_stance:', single_stance)
+
+
+    # 对单脚支撑状态给予奖励：取两脚的最小 in_mode_time（避免双脚状态极端不平衡）
+    reward = torch.min(
+        torch.where(single_stance.unsqueeze(-1), in_mode_time, torch.zeros_like(in_mode_time)),
+        dim=1
+    )[0]
+    
+    print('reward:', reward)
+
+
+    # 限制奖励上限
+    reward = torch.clamp(reward, max=threshold)
+    print('reward after clamp:', reward)
+
+    # 惩罚持续时间过长的状态（超过 1.5×threshold）
+    excessive_time = torch.max(in_mode_time, dim=1)[0] > (threshold * 1.5)
+    print('excessive_time:', excessive_time)
+    
+    penalty = excessive_time.float() * -0.1
+    print('penalty:', penalty)
+    
+    reward = reward + penalty
+    print('final reward:', reward)
+
+    return reward

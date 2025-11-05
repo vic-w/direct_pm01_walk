@@ -26,6 +26,10 @@ class DirectPm01WalkEnv(DirectRLEnv):
 
     def __init__(self, cfg: DirectPm01WalkEnvCfg, render_mode: str | None = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
+        
+        print("Available sensors:", list(self.scene.sensors.keys()))
+
+
         self.default_joint_pos = self.robot.data.default_joint_pos.clone()
         self.gait_phase = torch.zeros(self.num_envs, device=self.device)
 
@@ -280,6 +284,11 @@ class DirectPm01WalkEnv(DirectRLEnv):
         #weight = 0.2
         #reward += gait_phase_symmetry_rwd * weight
         #print("gait_phase_symmetry_rwd: %.3f \t weighted: %.3f" % (gait_phase_symmetry_rwd.mean().item(), gait_phase_symmetry_rwd.mean().item() * weight))
+        
+        feet_air_time_biped_reward = feet_air_time_biped(self, ['link_ankle_roll_l', 'link_ankle_roll_r'])
+        weight = 10
+        reward += feet_air_time_biped_reward * weight
+        print("feet_air_time_biped_reward: %.3f \t weighted: %.3f" % (feet_air_time_biped_reward.mean().item(), feet_air_time_biped_reward.mean().item() * weight))
 
         print("total reward: %.3f" % reward.mean().item())
         return reward

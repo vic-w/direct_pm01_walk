@@ -140,7 +140,7 @@ def ang_vel_xy_l2(env):
 
 
 
-def get_gait_phase_reward(env):
+def get_gait_phase_reward_(env):
     """
     基于 gait phase 的步态节奏奖励（无传感器版本）。
     当 gait phase 要求左脚摆动时，左脚应高、右脚应低；反之亦然。
@@ -175,11 +175,47 @@ def get_gait_phase_reward(env):
 
     # 归一化与截断，避免极端大值
     r_phase = torch.tanh(r_phase * 5.0)
-    # 限制最大值为 0.2
-    r_phase = torch.clamp(r_phase, max=0.2, min=-0.2)
+    # 限制最大值为 0.4
+    r_phase = torch.clamp(r_phase, max=0.4, min=-0.4)
 
     return r_phase
 
+
+def get_gait_phase_reward(env):
+    """
+    基于 gait phase 的步态节奏奖励（仅考虑脚高度）。
+    当 gait phase 为正半周 (sin>0) 时，左脚应高、右脚应低；
+    当为负半周 (sin<0) 时，右脚应高、左脚应低。
+
+    目标高度波动幅度为 ±0.2 m。
+    """
+
+    body_pos = env.robot.data.body_pos_w   # (num_envs, num_bodies, 3)
+    l_id, r_id = env._l, env._r
+
+    # 当前脚的世界坐标高度
+    zL, zR = body_pos[:, l_id, 2], body_pos[:, r_id, 2]
+
+    # 当前步态相位（假设随时间线性增加）
+    phase = env.gait_phase
+    phase_sin = torch.sin(phase)
+
+    # 理想的脚高度曲线：sin(phase) 对应的目标高度
+    # 左脚：在 sin>0 时高，右脚相反
+    target_L = 0.1 + 0.1 * torch.clamp(phase_sin, min=0.0)   # 正半周抬高到 +0.2m
+    target_R = 0.1 + 0.1 * torch.clamp(-phase_sin, min=0.0)  # 负半周抬高到 +0.2m
+
+    # 实际脚高度与目标高度的偏差
+    err_L = (zL - target_L).pow(2)
+    err_R = (zR - target_R).pow(2)
+
+    # 总误差
+    total_err = err_L + err_R
+
+    # 平滑奖励：误差越小奖励越高
+    r_phase = torch.exp(-50.0 * total_err)   # 50 控制容忍度，可调 20–80 之间
+    return r_phase
+    
 
 def joint_deviation_l1(env, joint_names=None):
     """指定关节的偏离默认角度的 L1 惩罚。

@@ -62,22 +62,32 @@ PM01_CFG = ArticulationCfg(
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.85), 
         joint_pos={
-            "j00_hip_pitch_l": -0.0,   # 左髋前屈
-            "j03_knee_pitch_l": 0.0,   # 左膝弯曲
-            "j04_ankle_pitch_l": 0.0, # 左踝背屈（脚尖稍下压）
+            "j14_shoulder_roll_l": 0.3,
+            "j19_shoulder_roll_r": -0.3,
+            
+            "j00_hip_pitch_l": -0.2,   # 左髋前屈
+            "j03_knee_pitch_l": 0.45,   # 左膝弯曲
+            "j04_ankle_pitch_l": -0.2, # 左踝背屈（脚尖稍下压）
 
-            "j06_hip_pitch_r": -0.0,   # 右髋前屈
-            "j09_knee_pitch_r": 0.0,   # 右膝弯曲
-            "j10_ankle_pitch_r": -0.0, # 右踝背屈
+            "j06_hip_pitch_r": -0.2,   # 右髋前屈
+            "j09_knee_pitch_r": 0.45,   # 右膝弯曲
+            "j10_ankle_pitch_r": -0.2, # 右踝背屈
         }
     ),
     soft_joint_pos_limit_factor=0.9,
     actuators={
+        "ankles": ImplicitActuatorCfg(
+            joint_names_expr=[".*ankle.*"],
+            effort_limit_sim=150.0,
+            stiffness=50.0,
+            damping=5.0,
+        ),        
         "default": ImplicitActuatorCfg(
             joint_names_expr=[".*"],     # ✅ 匹配全部关节
             effort_limit_sim=300.0,      # 力矩上限，可稍大点以防漂移
             stiffness=50.0,             # 高刚度 -> 僵硬
             damping=5.0,                 # 阻尼 -> 稳定
         ),
+
     },
 )

@@ -236,22 +236,22 @@ class DirectPm01WalkEnv(DirectRLEnv):
         print("joint_symmetry_penalty: %.3f \t weighted: %.3f" % (-joint_symmetry_penalty.mean().item(), -joint_symmetry_penalty.mean().item() * weight))
 
         left_leg_sum_penalty = joint_sum_l2(self, joint_names=["j00_hip_pitch_l", "j03_knee_pitch_l", "j04_ankle_pitch_l"])
-        weight = 0.2
+        weight = 0.1
         reward -= left_leg_sum_penalty * weight
         print("left_leg_sum_penalty: %.3f \t weighted: %.3f" % (-left_leg_sum_penalty.mean().item(), -left_leg_sum_penalty.mean().item() * weight))
 
         left_leg_equal_penalty = joint_equal_l2(self, joint_name_a="j00_hip_pitch_l", joint_name_b="j04_ankle_pitch_l")
-        weight = 0.2
+        weight = 0.1
         reward -= left_leg_equal_penalty * weight
         print("left_leg_equal_penalty: %.3f \t weighted: %.3f" % (-left_leg_equal_penalty.mean().item(), -left_leg_equal_penalty.mean().item() * weight))
 
         right_leg_sum_penalty = joint_sum_l2(self, joint_names=["j06_hip_pitch_r", "j09_knee_pitch_r", "j10_ankle_pitch_r"])
-        weight = 0.2
+        weight = 0.1
         reward -= right_leg_sum_penalty * weight
         print("right_leg_sum_penalty: %.3f \t weighted: %.3f" % (-right_leg_sum_penalty.mean().item(), -right_leg_sum_penalty.mean().item() * weight))
 
         right_leg_equal_penalty = joint_equal_l2(self, joint_name_a="j06_hip_pitch_r", joint_name_b="j10_ankle_pitch_r")
-        weight = 0.2
+        weight = 0.1
         reward -= right_leg_equal_penalty * weight
         print("right_leg_equal_penalty: %.3f \t weighted: %.3f" % (-right_leg_equal_penalty.mean().item(), -right_leg_equal_penalty.mean().item() * weight))
 

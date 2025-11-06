@@ -18,7 +18,8 @@ from isaaclab.utils.math import sample_uniform
 from .direct_pm01_walk_env_cfg import DirectPm01WalkEnvCfg
 from direct_pm01_walk.tasks.direct.direct_pm01_walk.rewards.rewards import *
 from isaaclab.utils.math import quat_apply
-
+from isaaclab.utils.math import quat_rotate_inverse, euler_xyz_from_quat
+   
 
 
 class DirectPm01WalkEnv(DirectRLEnv):
@@ -96,31 +97,16 @@ class DirectPm01WalkEnv(DirectRLEnv):
         self.robot.set_joint_position_target(joint_target)
 
 
+ 
     def _get_observations(self) -> dict:
-        current_lin_vel_b = self.robot.data.root_lin_vel_b
-        current_ang_vel_b = self.robot.data.root_ang_vel_b
-        # IMU 安装在 base link 原点且坐标与 base 一致，因此直接使用身体坐标系下的速度做差分。
-        # 差分过程中不涉及世界系转换，得到的线/角加速度仍然位于 IMU（身体）坐标系。
 
-        imu_lin_acc_b = (current_lin_vel_b - self._prev_root_lin_vel_b) / self.control_dt
-        imu_ang_acc_b = (current_ang_vel_b - self._prev_root_ang_vel_b) / self.control_dt / 10
-        
-        imu_lin_acc_b = 0.1 * torch.tanh(imu_lin_acc_b)
-        imu_ang_acc_b = 0.1 * torch.tanh(imu_ang_acc_b)
-
-        self._prev_root_lin_vel_b.copy_(current_lin_vel_b)
-        self._prev_root_ang_vel_b.copy_(current_ang_vel_b)
-    
-        base_lin_vel = torch.zeros_like(self.robot.data.root_lin_vel_b) # self.robot.data.root_lin_vel_b
-        base_ang_vel = torch.zeros_like(self.robot.data.root_ang_vel_b) # self.robot.data.root_ang_vel_b
+        base_quat = self.robot.data.root_quat_w
+        base_ang_vel = quat_rotate_inverse(base_quat, self.robot.data.root_ang_vel_w)
+        roll, pitch, yaw = euler_xyz_from_quat(base_quat)
+        base_euler_xyz = torch.stack([roll, pitch, yaw], dim=-1)
 
         joint_pos = self.robot.data.joint_pos
         joint_vel = self.robot.data.joint_vel
-
-        base_quat = self.robot.data.root_quat_w
-        num_envs = base_quat.shape[0]
-        gravity_vec = torch.tensor([0.0, 0.0, -1.0], device=self.device, dtype=torch.float32).repeat(num_envs, 1)
-        projected_gravity = quat_apply(base_quat, gravity_vec)  # (num_envs, 3)
 
         # phase的sin和cos
         phase_sin = torch.sin(self.gait_phase).unsqueeze(-1)
@@ -128,11 +114,10 @@ class DirectPm01WalkEnv(DirectRLEnv):
 
         obs = torch.cat(
             [
-                imu_lin_acc_b,
-                imu_ang_acc_b,
+                base_ang_vel,
+                base_euler_xyz,
                 joint_pos,
                 joint_vel,
-                projected_gravity,
                 phase_sin,
                 phase_cos,
                 self.commands,

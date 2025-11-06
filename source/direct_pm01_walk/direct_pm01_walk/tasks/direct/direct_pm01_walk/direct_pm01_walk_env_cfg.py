@@ -82,7 +82,7 @@ class DirectPm01WalkEnvCfg(DirectRLEnvCfg):
 
     # - spaces definition
     action_space = 24
-    observation_space = 62
+    observation_space = 59
     state_space = 2
 
     # simulation

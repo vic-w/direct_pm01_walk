@@ -52,7 +52,7 @@ PM01_CFG = ArticulationCfg(
             max_depenetration_velocity=100.0,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            enabled_self_collisions=False,
+            enabled_self_collisions=True,
             solver_position_iteration_count=4,
             solver_velocity_iteration_count=1,
             sleep_threshold=0.005,
@@ -75,13 +75,7 @@ PM01_CFG = ArticulationCfg(
         }
     ),
     soft_joint_pos_limit_factor=0.9,
-    actuators={
-        "ankles": ImplicitActuatorCfg(
-            joint_names_expr=[".*ankle.*"],
-            effort_limit_sim=150.0,
-            stiffness=100.0,
-            damping=10.0,
-        ),        
+    actuators={  
         "default": ImplicitActuatorCfg(
             joint_names_expr=[".*"],     # ✅ 匹配全部关节
             effort_limit_sim=300.0,      # 力矩上限，可稍大点以防漂移

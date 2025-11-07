@@ -18,7 +18,7 @@ from isaaclab.utils.math import sample_uniform
 from .direct_pm01_walk_env_cfg import DirectPm01WalkEnvCfg
 from direct_pm01_walk.tasks.direct.direct_pm01_walk.rewards.rewards import *
 from isaaclab.utils.math import quat_apply
-from isaaclab.utils.math import quat_rotate_inverse, euler_xyz_from_quat
+from isaaclab.utils.math import quat_apply_inverse, euler_xyz_from_quat
    
 
 
@@ -44,6 +44,7 @@ class DirectPm01WalkEnv(DirectRLEnv):
         self._prev_root_lin_vel_b = torch.zeros_like(self.robot.data.root_lin_vel_b)
         self._prev_root_ang_vel_b = torch.zeros_like(self.robot.data.root_ang_vel_b)
 
+        self._prev_actions = torch.zeros_like(self.robot.data.default_joint_pos)
 
         #指令相关
         # 行走指令（机体坐标系下 vx, vy, wz）
@@ -101,7 +102,7 @@ class DirectPm01WalkEnv(DirectRLEnv):
     def _get_observations(self) -> dict:
 
         base_quat = self.robot.data.root_quat_w
-        base_ang_vel = quat_rotate_inverse(base_quat, self.robot.data.root_ang_vel_w)
+        base_ang_vel = quat_apply_inverse(base_quat, self.robot.data.root_ang_vel_w)
         roll, pitch, yaw = euler_xyz_from_quat(base_quat)
         base_euler_xyz = torch.stack([roll, pitch, yaw], dim=-1)
 
@@ -114,10 +115,11 @@ class DirectPm01WalkEnv(DirectRLEnv):
 
         obs = torch.cat(
             [
-                base_ang_vel,
+                base_ang_vel * 0.1,
                 base_euler_xyz,
                 joint_pos,
-                joint_vel,
+                joint_vel * 0.1,
+                self._prev_actions,
                 phase_sin,
                 phase_cos,
                 self.commands,
@@ -162,15 +164,16 @@ class DirectPm01WalkEnv(DirectRLEnv):
         print("joint_acc_penalty: %.3f \t weighted: %.3f" % (-joint_acc_penalty.mean().item(), -joint_acc_penalty.mean().item() * weight))
         reward -= joint_acc_penalty * weight
 
-        #action_rate_penalty = action_rate_l2(self)
-        #weight = 0.01
-        #print("action_rate_penalty: %.3f \t weighted: %.3f" % (-action_rate_penalty.mean().item(), -action_rate_penalty.mean().item() * weight))
-        #reward -= action_rate_penalty * weight
+        action_rate_penalty = action_rate_l2(self)
+        print('action_rate_penalty', action_rate_penalty)
+        weight = 0.0001#10
+        print("action_rate_penalty: %.3f \t weighted: %.3f" % (-action_rate_penalty.mean().item(), -action_rate_penalty.mean().item() * weight))
+        reward -= action_rate_penalty * weight
         
-        action_velocity_continuity_penalty = action_velocity_continuity(self)
-        weight = 0.01
-        print("action_velocity_continuity_penalty: %.3f \t weighted: %.3f" % (-action_velocity_continuity_penalty.mean().item(), -action_velocity_continuity_penalty.mean().item() * weight))
-        reward -= action_velocity_continuity_penalty * weight
+        # action_velocity_continuity_penalty = action_velocity_continuity(self)
+        # weight = 0.1
+        # print("action_velocity_continuity_penalty: %.3f \t weighted: %.3f" % (-action_velocity_continuity_penalty.mean().item(), -action_velocity_continuity_penalty.mean().item() * weight))
+        # reward -= action_velocity_continuity_penalty * weight
        
 
         lin_vel_z_penalty = lin_vel_z_l2(self)
@@ -184,7 +187,7 @@ class DirectPm01WalkEnv(DirectRLEnv):
         reward -= ang_vel_xy_penalty * weight
 
         gait_phase_reward = get_gait_phase_reward(self)
-        weight = 20 #逐渐调大权重
+        weight = 0#20 #逐渐调大权重
         print("gait_phase_reward: %.3f \t weighted: %.3f" % (gait_phase_reward.mean().item(), gait_phase_reward.mean().item() * weight))
         reward += gait_phase_reward * weight
         
@@ -219,15 +222,6 @@ class DirectPm01WalkEnv(DirectRLEnv):
         reward -= leg_deviation_penalty * weight
         print("leg_deviation_penalty: %.3f \t weighted: %.3f" % (-leg_deviation_penalty.mean().item(), -leg_deviation_penalty.mean().item() * weight))
 
-        joint_symmetry_penalty = joint_symmetry_l2(self, 
-                                                   joint_pairs=[
-                                                       ["j00_hip_pitch_l", "j06_hip_pitch_r"],
-                                                       ["j03_knee_pitch_l", "j09_knee_pitch_r"],
-                                                       ["j04_ankle_pitch_l", "j10_ankle_pitch_r"],
-                                                   ])
-        weight = 0.0
-        reward -= joint_symmetry_penalty * weight
-        print("joint_symmetry_penalty: %.3f \t weighted: %.3f" % (-joint_symmetry_penalty.mean().item(), -joint_symmetry_penalty.mean().item() * weight))
 
         left_leg_sum_penalty = joint_sum_l2(self, joint_names=["j00_hip_pitch_l", "j03_knee_pitch_l", "j04_ankle_pitch_l"])
         weight = 1
@@ -251,12 +245,12 @@ class DirectPm01WalkEnv(DirectRLEnv):
 
         #指令跟踪奖励
         command_lin_vel_reward = command_lin_vel_tracking_reward(self)
-        weight = 3.0
+        weight = 0#3.0
         reward += command_lin_vel_reward * weight
         print("command_lin_vel_reward: %.3f \t weighted: %.3f" % (command_lin_vel_reward.mean().item(), command_lin_vel_reward.mean().item() * weight))
 
         command_ang_vel_reward = command_ang_vel_tracking_reward(self)
-        weight = 0.5
+        weight = 0#0.5
         reward += command_ang_vel_reward * weight
         print("command_ang_vel_reward: %.3f \t weighted: %.3f" % (command_ang_vel_reward.mean().item(), command_ang_vel_reward.mean().item() * weight))
         
@@ -270,7 +264,7 @@ class DirectPm01WalkEnv(DirectRLEnv):
         #print("gait_phase_symmetry_rwd: %.3f \t weighted: %.3f" % (gait_phase_symmetry_rwd.mean().item(), gait_phase_symmetry_rwd.mean().item() * weight))
         
         feet_air_time_biped_reward = feet_air_time_biped(self, ['link_ankle_roll_l', 'link_ankle_roll_r'])
-        weight = 10
+        weight = 0#10
         reward += feet_air_time_biped_reward * weight
         print("feet_air_time_biped_reward: %.3f \t weighted: %.3f" % (feet_air_time_biped_reward.mean().item(), feet_air_time_biped_reward.mean().item() * weight))
 
@@ -304,6 +298,8 @@ class DirectPm01WalkEnv(DirectRLEnv):
         root_state[:, :3] += self.scene.env_origins[env_ids]
 
         #print("root state after setting origin:", root_state[0])
+        self._prev_actions[env_ids] = torch.zeros_like(self.robot.data.default_joint_pos[env_ids])
+
         # 重置 IMU 速度缓存为0
         self._prev_root_lin_vel_b[env_ids] = torch.zeros_like(self._prev_root_lin_vel_b[env_ids])
         self._prev_root_ang_vel_b[env_ids] = torch.zeros_like(self._prev_root_ang_vel_b[env_ids])

@@ -114,42 +114,47 @@ def action_rate_l2(env):
         return torch.zeros(actions.shape[0], device=actions.device, dtype=actions.dtype)
 
     prev_actions = prev_actions.to(device=actions.device, dtype=actions.dtype)
+    #print('prev:', prev_actions)
+    #print('curr:', actions)
     delta = actions - prev_actions
-    return torch.sum(delta.pow(2), dim=1)
+    #print('delta:', delta)
+    penalty = torch.sum(delta.pow(2), dim=1)
+    #print('penalty:', penalty)
+    return penalty
 
-def action_velocity_continuity(env):
-    """动作速度连续性惩罚，鼓励action变化平滑。
-                因为action表示关节目标位置，所以此处等价于限制关节位置指令的一阶导变化率。
-    """
+# def action_velocity_continuity(env):
+#     """动作速度连续性惩罚，鼓励action变化平滑。
+#                 因为action表示关节目标位置，所以此处等价于限制关节位置指令的一阶导变化率。
+#     """
 
-    actions = getattr(env, "actions", None)
-    if actions is None:
-        joint_pos = env.robot.data.joint_pos
-        return torch.zeros(joint_pos.shape[0], device=env.device, dtype=joint_pos.dtype)
+#     actions = getattr(env, "actions", None)
+#     if actions is None:
+#         joint_pos = env.robot.data.joint_pos
+#         return torch.zeros(joint_pos.shape[0], device=env.device, dtype=joint_pos.dtype)
 
-    # 取上一次的action和上上次的action
-    prev_actions = getattr(env, "_prev_actions", None)
-    prev_vel = getattr(env, "_prev_action_vel", None)
+#     # 取上一次的action和上上次的action
+#     prev_actions = getattr(env, "_prev_actions", None)
+#     prev_vel = getattr(env, "_prev_action_vel", None)
    
-    # 当前动作速度（位置变化率）
-    if prev_actions is not None:
-        curr_vel = actions - prev_actions
-    else:
-        curr_vel = torch.zeros_like(actions)
+#     # 当前动作速度（位置变化率）
+#     if prev_actions is not None:
+#         curr_vel = actions - prev_actions
+#     else:
+#         curr_vel = torch.zeros_like(actions)
 
-    # 存储当前状态供下次调用
-    env._prev_action_vel = curr_vel.clone()
-    env._prev_actions = actions.clone()
+#     # 存储当前状态供下次调用
+#     env._prev_action_vel = curr_vel.clone()
+#     env._prev_actions = actions.clone()
 
-    # 若还没有历史数据，则返回0
-    if prev_vel is None or prev_actions is None:
-        return torch.zeros(actions.shape[0], device=actions.device, dtype=actions.dtype)
+#     # 若还没有历史数据，则返回0
+#     if prev_vel is None or prev_actions is None:
+#         return torch.zeros(actions.shape[0], device=actions.device, dtype=actions.dtype)
 
-    # 计算动作速度变化率（二阶差分）
-    delta_vel = curr_vel - prev_vel
+#     # 计算动作速度变化率（二阶差分）
+#     delta_vel = curr_vel - prev_vel
 
-    # L2 范数惩罚
-    return torch.sum(delta_vel.pow(2), dim=1)
+#     # L2 范数惩罚
+#     return torch.sum(delta_vel.pow(2), dim=1)
 
 
 def lin_vel_z_l2(env):

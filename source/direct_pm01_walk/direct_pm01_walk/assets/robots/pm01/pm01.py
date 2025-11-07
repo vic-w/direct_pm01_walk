@@ -61,30 +61,41 @@ PM01_CFG = ArticulationCfg(
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.85), 
-        joint_pos={
-            "j14_shoulder_roll_l": 0.3,
-            "j19_shoulder_roll_r": -0.3,
+        # joint_pos={
+        #     "j14_shoulder_roll_l": 0.3,
+        #     "j19_shoulder_roll_r": -0.3,
             
-            "j00_hip_pitch_l": -0.2,   # 左髋前屈
-            "j03_knee_pitch_l": 0.45,   # 左膝弯曲
-            "j04_ankle_pitch_l": -0.2, # 左踝背屈（脚尖稍下压）
+        #     "j00_hip_pitch_l": -0.2,   # 左髋前屈
+        #     "j03_knee_pitch_l": 0.45,   # 左膝弯曲
+        #     "j04_ankle_pitch_l": -0.2, # 左踝背屈（脚尖稍下压）
 
-            "j06_hip_pitch_r": -0.2,   # 右髋前屈
-            "j09_knee_pitch_r": 0.45,   # 右膝弯曲
-            "j10_ankle_pitch_r": -0.2, # 右踝背屈
-        }
+        #     "j06_hip_pitch_r": -0.2,   # 右髋前屈
+        #     "j09_knee_pitch_r": 0.45,   # 右膝弯曲
+        #     "j10_ankle_pitch_r": -0.2, # 右踝背屈
+        # }
     ),
     soft_joint_pos_limit_factor=0.9,
     actuators={
         "ankles": ImplicitActuatorCfg(
-            joint_names_expr=[".*ankle.*"],
-            effort_limit_sim=150.0,
-            stiffness=100.0,
-            damping=10.0,
+            joint_names_expr=[
+                "j04_ankle_pitch_l", "j05_ankle_roll_l",
+                "j10_ankle_pitch_r", "j11_ankle_roll_r"
+            ],
+            effort_limit_sim=300000.0,
+            stiffness=50.0,
+            damping=5.0,
         ),        
         "default": ImplicitActuatorCfg(
-            joint_names_expr=[".*"],     # ✅ 匹配全部关节
-            effort_limit_sim=300.0,      # 力矩上限，可稍大点以防漂移
+            joint_names_expr=[
+                "j00_hip_pitch_l", "j01_hip_roll_l", "j02_hip_yaw_l", "j03_knee_pitch_l",
+                "j06_hip_pitch_r", "j07_hip_roll_r", "j08_hip_yaw_r", "j09_knee_pitch_r",
+                "j12_waist_yaw",
+                "j13_shoulder_pitch_l", "j14_shoulder_roll_l", "j15_shoulder_yaw_l",
+                "j16_elbow_pitch_l", "j17_elbow_yaw_l",
+                "j18_shoulder_pitch_r", "j19_shoulder_roll_r", "j20_shoulder_yaw_r",
+                "j21_elbow_pitch_r", "j22_elbow_yaw_r", "j23_head_yaw"
+            ],
+            effort_limit_sim=300000.0,      # 力矩上限，可稍大点以防漂移
             stiffness=50.0,             # 高刚度 -> 僵硬
             damping=5.0,                 # 阻尼 -> 稳定
         ),

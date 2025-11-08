@@ -127,7 +127,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="../meshes/link_knee_pitch_l.stl" />
+        <mesh filename="../meshes/link_knee_pitch_l_collision.stl" />
       </geometry>
     </collision>
   </link>
@@ -153,12 +153,6 @@
         <color rgba="0.75294 0.75294 0.75294 1" />
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0" />
-      <geometry>
-        <mesh filename="../meshes/link_ankle_pitch_l.stl" />
-      </geometry>
-    </collision>
   </link>
   <joint name="j04_ankle_pitch_l" type="revolute">
     <origin xyz="-0.026756 0.00041994 -0.36305" rpy="0 0 0" />
@@ -301,7 +295,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="../meshes/link_knee_pitch_r.stl" />
+        <mesh filename="../meshes/link_knee_pitch_r_collision.stl" />
       </geometry>
     </collision>
   </link>
@@ -327,12 +321,6 @@
         <color rgba="0.75294 0.75294 0.75294 1" />
       </material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0" />
-      <geometry>
-        <mesh filename="../meshes/link_ankle_pitch_r.stl" />
-      </geometry>
-    </collision>
   </link>
   <joint name="j10_ankle_pitch_r" type="revolute">
     <origin xyz="-0.026756 -0.00041994 -0.36305" rpy="0 0 0" />
